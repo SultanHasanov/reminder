@@ -1,15 +1,17 @@
-import React, { useState, useEffect, useRef } from 'react';
+import React, { useState, useEffect } from 'react';
 import { Layout, TimePicker, Button, message, Input } from 'antd';
 import dayjs from 'dayjs';
 
 const { Content } = Layout;
 
 function App() {
-  const [reminderTime, setReminderTime] = useState(null);
+  const [reminderTime, setReminderTime] = useState(() => {
+    const savedTime = localStorage.getItem('reminderTime');
+    return savedTime ? dayjs(savedTime) : null;
+  });
   const [isReminderActive, setIsReminderActive] = useState(false);
-  const [reminderText, setReminderText] = useState('Пора принять таблетки!');
+  const [reminderText, setReminderText] = useState(() => localStorage.getItem('reminderText') || 'Пора принять таблетки!');
   const [deferredPrompt, setDeferredPrompt] = useState(null);
-  const intervalRef = useRef(null); // ref для хранения интервала
 
   useEffect(() => {
     const requestNotificationPermission = async () => {
@@ -30,6 +32,16 @@ function App() {
       window.removeEventListener('beforeinstallprompt', handleBeforeInstallPrompt);
     };
   }, []);
+
+  useEffect(() => {
+    if (reminderTime) {
+      localStorage.setItem('reminderTime', reminderTime.format());
+    }
+  }, [reminderTime]);
+
+  useEffect(() => {
+    localStorage.setItem('reminderText', reminderText);
+  }, [reminderText]);
 
   const showNotification = (title, options) => {
     if (Notification.permission === 'granted') {
@@ -52,31 +64,27 @@ function App() {
     const reminderHour = reminderTime.hour();
     const reminderMinute = reminderTime.minute();
 
-    intervalRef.current = setInterval(() => {
+    const checkTime = setInterval(() => {
       const currentTime = dayjs();
       const currentHour = currentTime.hour();
       const currentMinute = currentTime.minute();
 
-      // Проверка на совпадение текущего времени с временем напоминания
       if (currentHour === reminderHour && currentMinute === reminderMinute) {
         const speech = new SpeechSynthesisUtterance(reminderText);
         window.speechSynthesis.speak(speech);
 
         showNotification("Напоминание", { body: reminderText });
 
-        // Остановим проверку времени, если напоминание сработало
-        clearInterval(intervalRef.current);
+        clearInterval(checkTime);
         setIsReminderActive(false);
       }
-    }, 10000); // Проверка каждую минуту
+    }, 1000);
   };
 
   const stopReminder = () => {
     setIsReminderActive(false);
     message.info('Напоминание отключено');
-    clearInterval(intervalRef.current); // Очистка интервала
-    intervalRef.current = null; // Сброс рефа интервала
-    window.speechSynthesis.cancel(); // Остановка текущих голосовых уведомлений
+    window.speechSynthesis.cancel();
   };
 
   const handleInstallClick = () => {
@@ -100,6 +108,7 @@ function App() {
         <TimePicker
           style={{ width: '100%', marginBottom: '10px' }}
           onChange={handleTimeChange}
+          value={reminderTime}
           format="HH:mm"
           placeholder="Выберите время"
         />
