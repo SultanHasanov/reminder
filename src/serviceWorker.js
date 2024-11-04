@@ -1,5 +1,16 @@
 // src/serviceWorker.js
 
+// src/serviceWorker.js
+
+self.addEventListener('push', (event) => {
+  const data = event.data.json(); // Данные уведомления
+  self.registration.showNotification(data.title, {
+    body: data.body,
+    icon: '/path-to-icon.png' // Укажите путь к иконке, если требуется
+  });
+});
+
+
 const isLocalhost = Boolean(
   window.location.hostname === 'localhost' ||
     // [::1] is the IPv6 localhost address.

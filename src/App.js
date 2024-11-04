@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import { Layout, TimePicker, Button, message, Input } from 'antd';
 import dayjs from 'dayjs';
 
@@ -9,6 +9,7 @@ function App() {
   const [isReminderActive, setIsReminderActive] = useState(false);
   const [reminderText, setReminderText] = useState('Пора принять таблетки!');
   const [deferredPrompt, setDeferredPrompt] = useState(null);
+  const intervalRef = useRef(null); // ref для хранения интервала
 
   useEffect(() => {
     const requestNotificationPermission = async () => {
@@ -51,7 +52,7 @@ function App() {
     const reminderHour = reminderTime.hour();
     const reminderMinute = reminderTime.minute();
 
-    const checkTime = setInterval(() => {
+    intervalRef.current = setInterval(() => {
       const currentTime = dayjs();
       const currentHour = currentTime.hour();
       const currentMinute = currentTime.minute();
@@ -64,7 +65,7 @@ function App() {
         showNotification("Напоминание", { body: reminderText });
 
         // Остановим проверку времени, если напоминание сработало
-        clearInterval(checkTime);
+        clearInterval(intervalRef.current);
         setIsReminderActive(false);
       }
     }, 10000); // Проверка каждую минуту
@@ -73,6 +74,8 @@ function App() {
   const stopReminder = () => {
     setIsReminderActive(false);
     message.info('Напоминание отключено');
+    clearInterval(intervalRef.current); // Очистка интервала
+    intervalRef.current = null; // Сброс рефа интервала
     window.speechSynthesis.cancel(); // Остановка текущих голосовых уведомлений
   };
 
