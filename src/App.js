@@ -1,24 +1,107 @@
-import logo from './logo.svg';
-import './App.css';
+import React, { useState, useEffect } from 'react';
+import { Layout, TimePicker, Button, message, Input } from 'antd';
+import dayjs from 'dayjs';
+
+const { Content } = Layout;
 
 function App() {
+  const [reminderTime, setReminderTime] = useState(null);
+  const [isReminderActive, setIsReminderActive] = useState(false);
+  const [reminderText, setReminderText] = useState('Пора принять таблетки!');
+
+  const requestNotificationPermission = async () => {
+    if (Notification.permission !== 'granted') {
+      await Notification.requestPermission();
+    }
+  };
+
+  const showNotification = (title, options) => {
+    if (Notification.permission === 'granted') {
+      new Notification(title, options);
+    }
+  };
+
+  useEffect(() => {
+    requestNotificationPermission();
+  }, []);
+
+  const handleTimeChange = (time) => setReminderTime(time);
+  const handleTextChange = (e) => setReminderText(e.target.value);
+
+  const startReminder = () => {
+    if (!reminderTime) {
+      message.warning('Пожалуйста, выберите время напоминания');
+      return;
+    }
+
+    setIsReminderActive(true);
+    message.success('Напоминание включено');
+
+    const reminderHour = reminderTime.hour();
+    const reminderMinute = reminderTime.minute();
+
+    const checkTime = setInterval(() => {
+      const currentTime = dayjs();
+      const currentHour = currentTime.hour();
+      const currentMinute = currentTime.minute();
+      console.log("Текущее время:", currentTime.format("HH:mm"));
+      console.log("Время напоминания:", reminderTime.format("HH:mm"));
+
+      // Проверка на совпадение текущего времени с временем напоминания
+      if (currentHour === reminderHour && currentMinute === reminderMinute) {
+        console.log("Воспроизведение напоминания...");
+        const speech = new SpeechSynthesisUtterance(reminderText);
+        window.speechSynthesis.speak(speech);
+
+        showNotification("Напоминание", { body: reminderText });
+
+        // Остановим проверку времени, если напоминание сработало
+        clearInterval(checkTime);
+        setIsReminderActive(false);
+      }
+    }, 1000); // Проверка каждую минуту
+  };
+
+  const stopReminder = () => {
+    setIsReminderActive(false);
+    message.info('Напоминание отключено');
+    window.speechSynthesis.cancel(); // Остановка текущих голосовых уведомлений
+  };
+
   return (
-    <div className="App">
-      <header className="App-header">
-        <img src={logo} className="App-logo" alt="logo" />
-        <p>
-          Edit <code>src/App.js</code> and save to reload.
-        </p>
-        <a
-          className="App-link"
-          href="https://reactjs.org"
-          target="_blank"
-          rel="noopener noreferrer"
+    <Layout style={{ height: '100vh' }}>
+      <Content style={{ padding: '50px', maxWidth: '400px', margin: 'auto' }}>
+        <h2>Голосовое напоминание</h2>
+        <TimePicker
+          style={{ width: '100%', marginBottom: '10px' }}
+          onChange={handleTimeChange}
+          format="HH:mm"
+          placeholder="Выберите время"
+        />
+        <Input
+          style={{ width: '100%', marginBottom: '10px' }}
+          value={reminderText}
+          onChange={handleTextChange}
+          placeholder="Текст напоминания"
+        />
+        <Button
+          type="primary"
+          onClick={startReminder}
+          disabled={isReminderActive}
+          style={{ width: '100%', marginBottom: '10px' }}
         >
-          Learn React
-        </a>
-      </header>
-    </div>
+          Включить напоминание
+        </Button>
+        <Button
+          type="default"
+          onClick={stopReminder}
+          disabled={!isReminderActive}
+          style={{ width: '100%' }}
+        >
+          Отключить напоминание
+        </Button>
+      </Content>
+    </Layout>
   );
 }
 
