@@ -67,7 +67,7 @@ function App() {
         clearInterval(checkTime);
         setIsReminderActive(false);
       }
-    }, 1000); // Проверка каждую минуту
+    }, 10000); // Проверка каждую минуту
   };
 
   const stopReminder = () => {
