@@ -8,22 +8,33 @@ function App() {
   const [reminderTime, setReminderTime] = useState(null);
   const [isReminderActive, setIsReminderActive] = useState(false);
   const [reminderText, setReminderText] = useState('Пора принять таблетки!');
+  const [deferredPrompt, setDeferredPrompt] = useState(null);
 
-  const requestNotificationPermission = async () => {
-    if (Notification.permission !== 'granted') {
-      await Notification.requestPermission();
-    }
-  };
+  useEffect(() => {
+    const requestNotificationPermission = async () => {
+      if (Notification.permission !== 'granted') {
+        await Notification.requestPermission();
+      }
+    };
+
+    const handleBeforeInstallPrompt = (e) => {
+      e.preventDefault();
+      setDeferredPrompt(e);
+    };
+
+    requestNotificationPermission();
+    window.addEventListener('beforeinstallprompt', handleBeforeInstallPrompt);
+
+    return () => {
+      window.removeEventListener('beforeinstallprompt', handleBeforeInstallPrompt);
+    };
+  }, []);
 
   const showNotification = (title, options) => {
     if (Notification.permission === 'granted') {
       new Notification(title, options);
     }
   };
-
-  useEffect(() => {
-    requestNotificationPermission();
-  }, []);
 
   const handleTimeChange = (time) => setReminderTime(time);
   const handleTextChange = (e) => setReminderText(e.target.value);
@@ -44,12 +55,9 @@ function App() {
       const currentTime = dayjs();
       const currentHour = currentTime.hour();
       const currentMinute = currentTime.minute();
-      console.log("Текущее время:", currentTime.format("HH:mm"));
-      console.log("Время напоминания:", reminderTime.format("HH:mm"));
 
       // Проверка на совпадение текущего времени с временем напоминания
       if (currentHour === reminderHour && currentMinute === reminderMinute) {
-        console.log("Воспроизведение напоминания...");
         const speech = new SpeechSynthesisUtterance(reminderText);
         window.speechSynthesis.speak(speech);
 
@@ -66,6 +74,20 @@ function App() {
     setIsReminderActive(false);
     message.info('Напоминание отключено');
     window.speechSynthesis.cancel(); // Остановка текущих голосовых уведомлений
+  };
+
+  const handleInstallClick = () => {
+    if (deferredPrompt) {
+      deferredPrompt.prompt();
+      deferredPrompt.userChoice.then((choiceResult) => {
+        if (choiceResult.outcome === 'accepted') {
+          console.log('Пользователь принял установку приложения');
+        } else {
+          console.log('Пользователь отклонил установку приложения');
+        }
+        setDeferredPrompt(null);
+      });
+    }
   };
 
   return (
@@ -100,6 +122,15 @@ function App() {
         >
           Отключить напоминание
         </Button>
+        {deferredPrompt && (
+          <Button
+            type="primary"
+            onClick={handleInstallClick}
+            style={{ width: '100%', marginTop: '10px' }}
+          >
+            Установить приложение
+          </Button>
+        )}
       </Content>
     </Layout>
   );
