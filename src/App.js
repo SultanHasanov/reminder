@@ -1,6 +1,9 @@
 import React, { useState } from 'react';
 import axios from 'axios';
-import { BrowserRouter as Router, Route, Routes } from 'react-router-dom';
+import { Input, Button, Typography, message, Space, Card } from 'antd';
+import 'antd/dist/reset.css';
+
+const { Title, Text } = Typography;
 
 const BASE_URL = 'https://gatewayapi.telegram.org/';
 const TOKEN = 'AAHkCAAAQYk2l3sh4ky7v-sTrqZ3MRw5RpCoz9BKM_aLsg';
@@ -11,12 +14,9 @@ const HEADERS = {
 
 const App = () => {
   return (
-    <Router>
-      <Routes>
-        <Route path="/" element={<Auth />} />
-        <Route path="/success" element={<Success />} />
-      </Routes>
-    </Router>
+    <div style={{ display: 'flex', justifyContent: 'center', alignItems: 'center', height: '100vh', backgroundColor: '#f0f2f5' }}>
+      <Auth />
+    </div>
   );
 };
 
@@ -24,7 +24,7 @@ const Auth = () => {
   const [phone, setPhone] = useState('');
   const [code, setCode] = useState('');
   const [requestId, setRequestId] = useState(null);
-  const [status, setStatus] = useState('');
+  const [authSuccess, setAuthSuccess] = useState(false); // Флаг успешной авторизации
 
   const sendCode = async () => {
     try {
@@ -40,12 +40,12 @@ const Auth = () => {
       );
       if (response.data.ok) {
         setRequestId(response.data.result.request_id);
-        setStatus('Код отправлен, проверьте Telegram.');
+        message.success('Код отправлен, проверьте Telegram.');
       } else {
-        setStatus(`Ошибка: ${response.data.error}`);
+        message.error(`Ошибка: ${response.data.error}`);
       }
     } catch (error) {
-      setStatus(`Ошибка: ${error.message}`);
+      message.error(`Ошибка: ${error.message}`);
     }
   };
 
@@ -60,51 +60,50 @@ const Auth = () => {
         { headers: HEADERS }
       );
       if (response.data.ok && response.data.result.verification_status.status === 'code_valid') {
-        setStatus('Код подтверждён!');
-        window.location.href = '/success';
+        setAuthSuccess(true); // Успешная авторизация
+        message.success('Код подтверждён!');
       } else {
-        setStatus('Неверный код.');
+        message.error('Неверный код.');
       }
     } catch (error) {
-      setStatus(`Ошибка: ${error.message}`);
+      message.error(`Ошибка: ${error.message}`);
     }
   };
 
   return (
-    <div style={{ padding: '20px' }}>
-      <h1>Авторизация через Telegram</h1>
-      <div>
-        <label>
-          Телефон (в формате E.164): 
-          <input
-            type="text"
-            value={phone}
-            onChange={(e) => setPhone(e.target.value)}
-            placeholder="+79991234567"
-          />
-        </label>
-        <button onClick={sendCode}>Отправить код</button>
-      </div>
-      <div>
-        <label>
-          Введите код: 
-          <input
-            type="text"
-            value={code}
-            onChange={(e) => setCode(e.target.value)}
-          />
-        </label>
-        <button onClick={verifyCode}>Подтвердить</button>
-      </div>
-      <p>{status}</p>
-    </div>
+    <Card style={{ width: 400 }}>
+      {authSuccess ? (
+        <div style={{ textAlign: 'center' }}>
+          <Title level={3}>Авторизация прошла успешно!</Title>
+          <Text>Вы успешно вошли в систему. Добро пожаловать!</Text>
+        </div>
+      ) : (
+        <>
+          <Title level={3}>Авторизация через Telegram</Title>
+          <Space direction="vertical" style={{ width: '100%' }}>
+            <Text>Телефон:</Text>
+            <Input
+              placeholder="+79991234567"
+              value={phone}
+              onChange={(e) => setPhone(e.target.value)}
+            />
+            <Button type="primary" block onClick={sendCode}>
+              Отправить код
+            </Button>
+            <Text>Введите код:</Text>
+            <Input
+              placeholder="6-значный код"
+              value={code}
+              onChange={(e) => setCode(e.target.value)}
+            />
+            <Button type="primary" block onClick={verifyCode}>
+              Подтвердить
+            </Button>
+          </Space>
+        </>
+      )}
+    </Card>
   );
 };
-
-const Success = () => (
-  <div style={{ padding: '20px' }}>
-    <h1>Авторизация прошла успешно!</h1>
-  </div>
-);
 
 export default App;
