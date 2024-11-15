@@ -1,151 +1,110 @@
-import React, { useState, useEffect } from 'react';
-import { Layout, TimePicker, Button, message, Input } from 'antd';
-import dayjs from 'dayjs';
+import React, { useState } from 'react';
+import axios from 'axios';
+import { BrowserRouter as Router, Route, Routes } from 'react-router-dom';
 
-const { Content } = Layout;
+const BASE_URL = 'https://gatewayapi.telegram.org/';
+const TOKEN = 'AAHkCAAAQYk2l3sh4ky7v-sTrqZ3MRw5RpCoz9BKM_aLsg';
+const HEADERS = {
+  Authorization: `Bearer ${TOKEN}`,
+  'Content-Type': 'application/json',
+};
 
-function App() {
-  const [reminderTime, setReminderTime] = useState(() => {
-    const savedTime = localStorage.getItem('reminderTime');
-    return savedTime ? dayjs(savedTime) : null;
-  });
-  const [isReminderActive, setIsReminderActive] = useState(false);
-  const [reminderText, setReminderText] = useState(() => localStorage.getItem('reminderText') || 'Пора принять таблетки!');
-  const [deferredPrompt, setDeferredPrompt] = useState(null);
+const App = () => {
+  return (
+    <Router>
+      <Routes>
+        <Route path="/" element={<Auth />} />
+        <Route path="/success" element={<Success />} />
+      </Routes>
+    </Router>
+  );
+};
 
-  useEffect(() => {
-    const requestNotificationPermission = async () => {
-      if (Notification.permission !== 'granted') {
-        await Notification.requestPermission();
+const Auth = () => {
+  const [phone, setPhone] = useState('');
+  const [code, setCode] = useState('');
+  const [requestId, setRequestId] = useState(null);
+  const [status, setStatus] = useState('');
+
+  const sendCode = async () => {
+    try {
+      const response = await axios.post(
+        `${BASE_URL}sendVerificationMessage`,
+        {
+          phone_number: phone,
+          code_length: 6,
+          ttl: 60,
+          payload: 'auth_request',
+        },
+        { headers: HEADERS }
+      );
+      if (response.data.ok) {
+        setRequestId(response.data.result.request_id);
+        setStatus('Код отправлен, проверьте Telegram.');
+      } else {
+        setStatus(`Ошибка: ${response.data.error}`);
       }
-    };
-
-    const handleBeforeInstallPrompt = (e) => {
-      e.preventDefault();
-      setDeferredPrompt(e);
-    };
-
-    requestNotificationPermission();
-    window.addEventListener('beforeinstallprompt', handleBeforeInstallPrompt);
-
-    return () => {
-      window.removeEventListener('beforeinstallprompt', handleBeforeInstallPrompt);
-    };
-  }, []);
-
-  useEffect(() => {
-    if (reminderTime) {
-      localStorage.setItem('reminderTime', reminderTime.format());
-    }
-  }, [reminderTime]);
-
-  useEffect(() => {
-    localStorage.setItem('reminderText', reminderText);
-  }, [reminderText]);
-
-  const showNotification = (title, options) => {
-    if (Notification.permission === 'granted') {
-      new Notification(title, options);
+    } catch (error) {
+      setStatus(`Ошибка: ${error.message}`);
     }
   };
 
-  const handleTimeChange = (time) => setReminderTime(time);
-  const handleTextChange = (e) => setReminderText(e.target.value);
-
-  const startReminder = () => {
-    if (!reminderTime) {
-      message.warning('Пожалуйста, выберите время напоминания');
-      return;
-    }
-
-    setIsReminderActive(true);
-    message.success('Напоминание включено');
-
-    const reminderHour = reminderTime.hour();
-    const reminderMinute = reminderTime.minute();
-
-    const checkTime = setInterval(() => {
-      const currentTime = dayjs();
-      const currentHour = currentTime.hour();
-      const currentMinute = currentTime.minute();
-
-      if (currentHour === reminderHour && currentMinute === reminderMinute) {
-        const speech = new SpeechSynthesisUtterance(reminderText);
-        window.speechSynthesis.speak(speech);
-
-        showNotification("Напоминание", { body: reminderText });
-
-        clearInterval(checkTime);
-        setIsReminderActive(false);
+  const verifyCode = async () => {
+    try {
+      const response = await axios.post(
+        `${BASE_URL}checkVerificationStatus`,
+        {
+          request_id: requestId,
+          code: code,
+        },
+        { headers: HEADERS }
+      );
+      if (response.data.ok && response.data.result.verification_status.status === 'code_valid') {
+        setStatus('Код подтверждён!');
+        window.location.href = '/success';
+      } else {
+        setStatus('Неверный код.');
       }
-    }, 1000);
-  };
-
-  const stopReminder = () => {
-    setIsReminderActive(false);
-    message.info('Напоминание отключено');
-    window.speechSynthesis.cancel();
-  };
-
-  const handleInstallClick = () => {
-    if (deferredPrompt) {
-      deferredPrompt.prompt();
-      deferredPrompt.userChoice.then((choiceResult) => {
-        if (choiceResult.outcome === 'accepted') {
-          console.log('Пользователь принял установку приложения');
-        } else {
-          console.log('Пользователь отклонил установку приложения');
-        }
-        setDeferredPrompt(null);
-      });
+    } catch (error) {
+      setStatus(`Ошибка: ${error.message}`);
     }
   };
 
   return (
-    <Layout style={{ height: '100vh' }}>
-      <Content style={{ padding: '50px', maxWidth: '400px', margin: 'auto' }}>
-        <h2>Голосовое напоминание</h2>
-        <TimePicker
-          style={{ width: '100%', marginBottom: '10px' }}
-          onChange={handleTimeChange}
-          value={reminderTime}
-          format="HH:mm"
-          placeholder="Выберите время"
-        />
-        <Input
-          style={{ width: '100%', marginBottom: '10px' }}
-          value={reminderText}
-          onChange={handleTextChange}
-          placeholder="Текст напоминания"
-        />
-        <Button
-          type="primary"
-          onClick={startReminder}
-          disabled={isReminderActive}
-          style={{ width: '100%', marginBottom: '10px' }}
-        >
-          Включить напоминание
-        </Button>
-        <Button
-          type="default"
-          onClick={stopReminder}
-          disabled={!isReminderActive}
-          style={{ width: '100%' }}
-        >
-          Отключить напоминание
-        </Button>
-        {deferredPrompt && (
-          <Button
-            type="primary"
-            onClick={handleInstallClick}
-            style={{ width: '100%', marginTop: '10px' }}
-          >
-            Установить приложение
-          </Button>
-        )}
-      </Content>
-    </Layout>
+    <div style={{ padding: '20px' }}>
+      <h1>Авторизация через Telegram</h1>
+      <div>
+        <label>
+          Телефон (в формате E.164): 
+          <input
+            type="text"
+            value={phone}
+            onChange={(e) => setPhone(e.target.value)}
+            placeholder="+79991234567"
+          />
+        </label>
+        <button onClick={sendCode}>Отправить код</button>
+      </div>
+      <div>
+        <label>
+          Введите код: 
+          <input
+            type="text"
+            value={code}
+            onChange={(e) => setCode(e.target.value)}
+          />
+        </label>
+        <button onClick={verifyCode}>Подтвердить</button>
+      </div>
+      <p>{status}</p>
+    </div>
   );
-}
+};
+
+const Success = () => (
+  <div style={{ padding: '20px' }}>
+    <h1>Авторизация прошла успешно!</h1>
+  </div>
+);
 
 export default App;

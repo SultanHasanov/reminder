@@ -1,7 +1,6 @@
 import React from 'react';
 import ReactDOM from 'react-dom/client';
-import * as serviceWorker from './serviceWorker'; 
-import reportWebVitals from './reportWebVitals';
+
 import App from './App';
 
 
@@ -11,6 +10,4 @@ root.render(
     <App />
   </React.StrictMode>
 );
-serviceWorker.register(); 
 
-reportWebVitals();
